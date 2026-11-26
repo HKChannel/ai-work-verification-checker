@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Work Verification Checker</title>
+<meta name="description" content="Estimate how many AI-drafted claims leave your team unchecked and the review time to close the gap, then score your AI verification policy. Based on Elden v HMRC (2026)." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #F8FAFC; --surface: #FFFFFF; --ink: #0F172A; --muted: #475569; --line: #E2E8F0;
+    --cyan: #0891B2; --cyan-soft: #ECFEFF; --amber: #D97706; --amber-soft: #FFFBEB;
+    --leaf: #059669; --leaf-soft: #ECFDF5; --red: #DC2626; --red-soft: #FEF2F2;
+    --mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+    --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B132B; --surface: #131F3D; --ink: #F8FAFC; --muted: #A5B4CB; --line: #24345C;
+      --cyan-soft: rgba(8,145,178,.16); --amber-soft: rgba(217,119,6,.16); --leaf-soft: rgba(5,150,105,.16); --red-soft: rgba(220,38,38,.16);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  body { min-height: 100vh; }
+  .container { max-width: 1120px; margin: 0 auto; padding: 28px 16px 48px; }
+  header .eyebrow { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: .08em; color: var(--cyan); }
+  header h1 { font-size: clamp(26px, 4.5vw, 38px); font-weight: 900; letter-spacing: -.03em; margin: 6px 0 8px; line-height: 1.1; }
+  header p { color: var(--muted); max-width: 780px; line-height: 1.55; font-size: 15.5px; }
+  .tabs { display: flex; gap: 8px; margin: 24px 0 18px; flex-wrap: wrap; }
+  .tab { font: 700 14px var(--sans); padding: 11px 16px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 18px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--surface); border: 1.5px solid var(--line); border-radius: 16px; padding: 18px; min-width: 0; }
+  .card h2 { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+  .hint { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; font-weight: 700; margin-bottom: 6px; }
+  .field label output { font-family: var(--mono); color: var(--cyan); white-space: nowrap; }
+  .field .ceil { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  input[type="range"] { width: 100%; accent-color: var(--cyan); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  input[type="number"] { width: 100%; font: 600 14px var(--mono); padding: 9px 10px; border-radius: 9px; border: 1.5px solid var(--line); background: var(--bg); color: var(--ink); }
+  .sub-l { font-size: 11.5px; color: var(--muted); display: block; margin-bottom: 4px; font-weight: 600; }
+  .real { background: var(--amber-soft); border-radius: 12px; padding: 12px; }
+  .real label output { color: var(--amber); }
+  .row-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  button.btn { font: 700 13.5px var(--sans); padding: 10px 14px; border-radius: 10px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+  button.btn.primary { background: var(--cyan); border-color: var(--cyan); color: #fff; }
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { border-radius: 12px; padding: 12px 14px; border: 1.5px solid var(--line); }
+  .kpi .lbl { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+  .kpi .val { font-family: var(--mono); font-size: 26px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .kpi.h { background: var(--cyan-soft); } .kpi.h .val { color: var(--cyan); }
+  .kpi.d { background: var(--leaf-soft); } .kpi.d .val { color: var(--leaf); }
+  .kpi.f { background: var(--bg); }
+  .kpi.c { background: var(--amber-soft); } .kpi.c .val { color: var(--amber); }
+  .wf { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: 6px 12px; align-items: center; margin: 6px 0; font-size: 13.5px; }
+  .wf .name { font-weight: 700; }
+  .wf .hrs { font-family: var(--mono); text-align: right; font-weight: 700; }
+  .wf .bar { grid-column: 1 / -1; height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; position: relative; }
+  .wf .bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
+  .wf .bar .ceilb { background: rgba(8,145,178,.25); }
+  .wf .bar .realb { background: var(--cyan); }
+  
+  .note { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-top: 12px; padding: 10px 12px; border-left: 4px solid var(--line); background: var(--bg); border-radius: 0 8px 8px 0; }
+  .gate { border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .gate h3 { font-size: 15px; font-weight: 800; }
+  .gate p { font-size: 13px; color: var(--muted); margin: 3px 0 10px; line-height: 1.45; }
+  .seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .seg button { font: 700 12.5px var(--sans); padding: 9px 6px; border-radius: 8px; border: 1.5px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+  .seg button.on[data-val="0"] { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+  .seg button.on[data-val="1"] { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+  .seg button.on[data-val="2"] { background: var(--leaf-soft); border-color: var(--leaf); color: var(--leaf); }
+  .dial-wrap { text-align: center; }
+  .dial-pct { font: 700 46px var(--mono); margin-top: -64px; }
+  .band { display: inline-block; margin-top: 8px; font-weight: 800; padding: 8px 14px; border-radius: 999px; font-size: 14px; }
+  .band.b0 { background: var(--red-soft); color: var(--red); } .band.b1 { background: var(--amber-soft); color: var(--amber); } .band.b2 { background: var(--leaf-soft); color: var(--leaf); }
+  .next { text-align: left; margin-top: 16px; font-size: 13.5px; line-height: 1.55; }
+  .next li { margin: 0 0 6px 18px; }
+  .msg { font-size: 12.5px; margin-top: 8px; color: var(--muted); min-height: 18px; }
+  footer { margin-top: 32px; font-size: 12.5px; color: var(--muted); line-height: 1.6; border-top: 1px solid var(--line); padding-top: 14px; }
+  @media print { .tabs, .row-btns { display: none; } .panel { display: block !important; } }
+</style>
+</head>
+<body>
+<style>
+  .bars { margin-top: 6px; }
+  .bars .b { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 4px 10px; font-size: 13px; margin: 7px 0; }
+  .bars .b .t { font-weight: 700; }
+  .bars .b .h { font-family: var(--mono); text-align: right; font-weight: 700; }
+  .bars .b .track { grid-column: 1 / -1; height: 10px; border-radius: 999px; background: var(--line); position: relative; overflow: hidden; }
+  .bars .b .track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
+  .bars .ok { background: var(--leaf); } .bars .bad { background: var(--red); }
+  .presets { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .presets .btn.on { border-color: var(--leaf); color: var(--leaf); }
+</style>
+<div class="container">
+  <header>
+    <div class="eyebrow">COMPANION TOOL • AI IN FINANCE, DONE RIGHT • ELDEN v HMRC</div>
+    <h1>AI Work Verification Checker</h1>
+    <p>In Elden v HMRC (January 2026), a UK tax tribunal found that AI-produced case summaries filed by a firm of chartered accountants had not been verified with sufficient care, and called it "professional incompetence." Use this page to estimate how many AI-drafted claims leave your team unchecked, what that could let through, and the review time needed to close the gap. Then score your policy against the tribunal's standard.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tab-btn-1" role="tab" aria-selected="true" data-tab="1">1 · Verification gap</button>
+    <button class="tab" id="tab-btn-2" role="tab" aria-selected="false" data-tab="2">2 · Policy check</button>
+  </div>
+
+  <section class="panel active" id="panel-1">
+    <div class="grid">
+      <div class="card">
+        <h2>Your AI-assisted work</h2>
+        <div class="hint">Demo figures are made up. Replace them with your own.</div>
+        <div class="field pair">
+          <div><span class="sub-l">AI-assisted documents sent outside a month</span><input type="number" id="in-docs" min="0" step="1" /></div>
+          <div><span class="sub-l">Claims or citations per document</span><input type="number" id="in-claims" min="0" step="1" /></div>
+        </div>
+        <div class="field real">
+          <label for="in-ver">Share of claims checked against the source today <output id="out-ver"></output></label>
+          <input type="range" id="in-ver" min="0" max="100" step="5" />
+        </div>
+        <div class="field">
+          <span class="sub-l">Assumed error rate in unchecked AI claims (%)</span>
+          <input type="number" id="in-err" min="0" step="1" />
+          <div class="presets">
+            <button class="btn" data-err="5">Cautious 5%</button>
+            <button class="btn" data-err="20">Benchmark ~20%</button>
+          </div>
+          <div class="ceil">An assumption, not a finding. The tribunal gave no rate; in Elden, 3 of 5 summaries were wrong. ~20% reflects a 2026 test where the best AI model still failed about 1 in 5 accounting tasks.</div>
+        </div>
+        <div class="field pair">
+          <div><span class="sub-l">Minutes to check one claim</span><input type="number" id="in-min" min="0" step="1" /></div>
+          <div><span class="sub-l">Reviewer cost per hour ($)</span><input type="number" id="in-cost" min="0" step="5" /></div>
+        </div>
+        <div class="row-btns"><button class="btn" id="btn-reset">Reset demo figures</button></div>
+      </div>
+      <div class="card">
+        <h2>What leaves your team unchecked</h2>
+        <div class="hint">Per month, at the error rate you chose.</div>
+        <div class="kpis">
+          <div class="kpi f"><div class="lbl">AI claims a month</div><div class="val" id="kpi-claims">–</div><div class="sub">Documents × claims</div></div>
+          <div class="kpi c"><div class="lbl">Likely errors unchecked</div><div class="val" id="kpi-errors">–</div><div class="sub">Unchecked claims × error rate</div></div>
+          <div class="kpi h"><div class="lbl">Review hours to close</div><div class="val" id="kpi-hours">–</div><div class="sub">Unchecked claims × minutes</div></div>
+          <div class="kpi d"><div class="lbl">Cost a month</div><div class="val" id="kpi-cost">–</div><div class="sub">Review hours × cost</div></div>
+        </div>
+        <div class="bars" id="bars"></div>
+        <div class="note">Estimates only. One unchecked error in a submission to a court, regulator or auditor can cost far more than the review time, as the firm in Elden found.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-2">
+    <div class="grid">
+      <div class="card">
+        <h2>6 controls from the judgment</h2>
+        <div class="hint">Rate your firm or team honestly. Partial counts as half.</div>
+        <div id="gates"></div>
+      </div>
+      <div class="card dial-wrap">
+        <h2>How defensible is your AI use?</h2>
+        <svg viewBox="0 0 240 140" width="100%" style="max-width:320px">
+          <path d="M20 120 A100 100 0 0 1 220 120" fill="none" stroke="var(--line)" stroke-width="18" stroke-linecap="round" />
+          <path id="dial-arc" d="M20 120 A100 100 0 0 1 220 120" fill="none" stroke="var(--amber)" stroke-width="18" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100" />
+        </svg>
+        <div class="dial-pct" id="sc-pct">50%</div>
+        <div class="band b1" id="sc-band">Tighten before you scale</div>
+        <ol class="next" id="sc-next"></ol>
+        <div class="row-btns" style="justify-content:center">
+          <button class="btn primary" id="btn-copy">Copy AI verification policy draft</button>
+          <button class="btn" id="btn-print">Print / save PDF</button>
+        </div>
+        <div class="msg" id="copy-msg"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Built as a companion to an edition of the LinkedIn newsletter <b>AI in Finance, Done Right</b>, on Elden v HMRC [2026] UKFTT 41 (TC). Demo figures and error rates are assumptions, not findings from the judgment. This is not legal advice. Everything runs in your browser and nothing is uploaded.
+  </footer>
+</div>
+
+<script>
+(function () {
+  const DEMO = { docs: 40, claims: 8, ver: 40, err: 5, min: 4, cost: 90 };
+  const GATES = [
+    ['A named owner for every AI output', 'The policy says who signs and is responsible, in plain words.'],
+    ['Primary-source check', 'Direct quotes with paragraph references, sources attached.'],
+    ['A high-risk documents list', 'Documents AI may never draft unchecked: court, regulator, auditor submissions.'],
+    ['A sign-off trail', 'Who checked which statements, and when.'],
+    ['A straight disclosure answer', 'A prepared, honest statement on AI use. "Neither confirm nor deny" is not co-operation.'],
+    ['Deadline rules', 'No AI shortcut skips review when time is short.']
+  ];
+  const LABELS = ['No', 'Partial', 'Yes'];
+  const $ = (id) => document.getElementById(id);
+  const num = (id) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : 0; };
+  const usd = (v) => '$' + Math.round(Number(v.toFixed(2))).toLocaleString('en-US');
+  const one = (v) => (Math.round(v * 10) / 10).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+  function setDemo() { Object.entries(DEMO).forEach(([k, v]) => { $('in-' + k).value = v; }); }
+  function compute() {
+    const claims = num('in-docs') * num('in-claims');
+    const ver = Math.min(100, num('in-ver')) / 100;
+    const unchecked = claims * (1 - ver);
+    const errors = unchecked * Math.min(100, num('in-err')) / 100;
+    const hours = unchecked * num('in-min') / 60;
+    return { claims, ver, checked: claims - unchecked, unchecked, errors, hours, cost: hours * num('in-cost') };
+  }
+  function render() {
+    const r = compute();
+    $('out-ver').textContent = Math.round(r.ver * 100) + '%';
+    document.querySelectorAll('[data-err]').forEach((b) => b.classList.toggle('on', Number(b.dataset.err) === num('in-err')));
+    $('kpi-claims').textContent = Math.round(r.claims).toLocaleString('en-US');
+    $('kpi-errors').textContent = one(r.errors);
+    $('kpi-hours').textContent = one(r.hours) + ' hrs';
+    $('kpi-cost').textContent = usd(r.cost);
+    const max = Math.max(1, r.claims);
+    $('bars').innerHTML = `
+      <div class="b"><span class="t">Claims checked against the source</span><span class="h">${Math.round(r.checked).toLocaleString('en-US')}</span><span class="track"><i class="ok" style="width:${(r.checked / max * 100).toFixed(1)}%"></i></span></div>
+      <div class="b"><span class="t">Claims leaving unchecked</span><span class="h">${Math.round(r.unchecked).toLocaleString('en-US')}</span><span class="track"><i class="bad" style="width:${(r.unchecked / max * 100).toFixed(1)}%"></i></span></div>`;
+    window.__lastCase = r;
+  }
+
+  const vals = GATES.map(() => 1);
+  function renderGates() {
+    $('gates').innerHTML = GATES.map(([t, d], i) => `
+      <div class="gate"><h3>${i + 1}. ${t}</h3><p>${d}</p>
+        <div class="seg">${LABELS.map((l, v) => `<button data-idx="${i}" data-val="${v}" class="${vals[i] === v ? 'on' : ''}" aria-pressed="${vals[i] === v}">${l}</button>`).join('')}</div>
+      </div>`).join('');
+  }
+  function score() {
+    const p = Math.round(vals.reduce((s, v) => s + v, 0) / (GATES.length * 2) * 100);
+    $('sc-pct').textContent = p + '%';
+    const arc = $('dial-arc');
+    arc.setAttribute('stroke-dasharray', `${p} 100`);
+    const band = p >= 80 ? 2 : p >= 50 ? 1 : 0;
+    arc.setAttribute('stroke', ['var(--red)', 'var(--amber)', 'var(--leaf)'][band]);
+    const b = $('sc-band');
+    b.className = 'band b' + band;
+    b.textContent = ['High risk: pause unchecked external AI drafts', 'Tighten before you scale', 'Defensible AI use'][band];
+    const gaps = GATES.map((g, i) => [g[0], vals[i]]).filter(([, v]) => v < 2).sort((a, c) => a[1] - c[1]).slice(0, 3);
+    $('sc-next').innerHTML = gaps.length
+      ? gaps.map(([t, v]) => `<li><b>${t}</b>: ${v === 0 ? 'missing. Put this in writing before the next external submission.' : 'partly there. Make it a rule, not a habit.'}</li>`).join('')
+      : '<li>All six are in place. Audit a sample of AI-assisted work each quarter to prove it.</li>';
+    return p;
+  }
+
+  function memo() {
+    const p = score();
+    const r = window.__lastCase;
+    const lines = ['AI VERIFICATION POLICY (DRAFT)', '',
+      'Principle: the person who relies on AI output is responsible for its accuracy.', '',
+      'Rules:',
+      '1. Every AI-assisted document sent outside the team has a named owner who signs it.',
+      '2. Every source relied on is attached in full, quoted directly with paragraph or page references, and briefly summarized by a person.',
+      '3. Documents for courts, tribunals, regulators and auditors are never sent with unchecked AI content.',
+      '4. Reviewers record which statements they checked, and when.',
+      '5. If asked whether AI was used, we answer plainly and explain how the output was verified.',
+      '6. Deadlines never remove the review step.', ''];
+    if (r) lines.push(`Current gap: ${Math.round(r.claims).toLocaleString('en-US')} AI claims a month, ${Math.round(r.unchecked).toLocaleString('en-US')} unchecked; about ${one(r.errors)} likely errors at the assumed rate; ${one(r.hours)} review hours (${usd(r.cost)}) a month to close it.`, '');
+    lines.push(`Readiness: ${p}% (${$('sc-band').textContent})`, ...GATES.map((g, i) => `- ${g[0]}: ${LABELS[vals[i]]}`), '',
+      'Reference: Elden v HMRC [2026] UKFTT 41 (TC). Not legal advice.');
+    return lines.join('\n');
+  }
+
+  function selectTab(n) {
+    [1, 2].forEach((k) => {
+      $('tab-btn-' + k).setAttribute('aria-selected', String(k === n));
+      $('panel-' + k).classList.toggle('active', k === n);
+    });
+  }
+
+  document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => selectTab(Number(b.dataset.tab))));
+  document.querySelectorAll('#panel-1 input').forEach((el) => el.addEventListener('input', render));
+  document.querySelectorAll('[data-err]').forEach((b) => b.addEventListener('click', () => { $('in-err').value = b.dataset.err; render(); }));
+  $('btn-reset').addEventListener('click', () => {
+    setDemo();
+    for (let i = 0; i < vals.length; i++) vals[i] = 1;
+    renderGates(); score(); render();
+  });
+  $('gates').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-idx]');
+    if (!btn) return;
+    vals[Number(btn.dataset.idx)] = Number(btn.dataset.val);
+    renderGates(); score();
+  });
+  $('btn-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(memo()); $('copy-msg').textContent = 'Policy draft copied to clipboard.'; }
+    catch { $('copy-msg').textContent = 'Your browser blocked the clipboard. Use Print / save PDF instead.'; }
+  });
+  $('btn-print').addEventListener('click', () => window.print());
+
+  setDemo(); renderGates(); score(); render();
+})();
+</script>
+</body>
+</html>
